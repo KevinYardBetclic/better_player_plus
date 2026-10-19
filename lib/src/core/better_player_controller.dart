@@ -1162,6 +1162,25 @@ class BetterPlayerController {
   ///clear the cache.
   Future<void> clearCache() => VideoPlayerController.clearCache();
 
+  /// Sets whether the plugin owns the platform audio session, for every player
+  /// created from now on and every player already alive.
+  ///
+  /// By default (`true`) the plugin configures the iOS `AVAudioSession` itself:
+  /// it sets a non-mixable `.playback` category whenever a player is created,
+  /// activates the session when notification controls or picture-in-picture
+  /// start, and deactivates it once the last player is disposed.
+  ///
+  /// Pass `false` when the app manages the audio session itself, for instance
+  /// to coordinate several audio sources or to keep the synchronous
+  /// deactivation off the main thread. The plugin then never sets the category
+  /// nor activates or deactivates the session, and the app must activate a
+  /// `.playback` session before relying on background audio or
+  /// picture-in-picture.
+  ///
+  /// Only affects iOS; on Android it completes without doing anything.
+  static Future<void> setManagesAudioSession(bool managesAudioSession) =>
+      VideoPlayerController.setManagesAudioSession(managesAudioSession);
+
   ///Build headers map that will be used to setup video player controller. Apply
   ///DRM headers if available.
   Map<String, String?> _getHeaders() {

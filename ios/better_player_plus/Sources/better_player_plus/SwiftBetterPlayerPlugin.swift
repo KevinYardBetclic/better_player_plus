@@ -17,6 +17,8 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
     private var texturesCount: Int64 = -1
     private var notificationPlayer: BetterPlayer?
     private var remoteCommandsInitialized = false
+    // When false, the host app owns AVAudioSession: the plugin never sets its category nor (de)activates it.
+    private var managesAudioSession = true
 
     init(registrar: FlutterPluginRegistrar) {
         self.messenger = registrar.messenger()
@@ -58,6 +60,7 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
     private func onPlayerSetup(_ player: BetterPlayer, result: FlutterResult) {
         let textureId = newTextureId()
         let eventChannel = FlutterEventChannel(name: "better_player_channel/videoEvents\(textureId)", binaryMessenger: messenger)
+        player.managesAudioSession = managesAudioSession
         player.setMixWithOthers(false)
         eventChannel.setStreamHandler(player)
         player.eventChannel = eventChannel
@@ -82,12 +85,12 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
     }
 
     private func setRemoteCommandsNotificationActive() {
-        try? AVAudioSession.sharedInstance().setActive(true)
+        if managesAudioSession { try? AVAudioSession.sharedInstance().setActive(true) }
         UIApplication.shared.beginReceivingRemoteControlEvents()
     }
 
     private func setRemoteCommandsNotificationNotActive() {
-        if players.isEmpty {
+        if managesAudioSession && players.isEmpty {
             try? AVAudioSession.sharedInstance().setActive(false)
         }
         UIApplication.shared.endReceivingRemoteControlEvents()
@@ -227,6 +230,13 @@ extension BetterPlayerPlugin {
             result(nil)
             return
         }
+        if call.method == "setManagesAudioSession" {
+            let argsMap = call.arguments as? [String: Any]
+            managesAudioSession = (argsMap?["managesAudioSession"] as? NSNumber)?.boolValue ?? true
+            for (_, player) in players { player.managesAudioSession = managesAudioSession }
+            result(nil)
+            return
+        }
         if call.method == "create" {
             let player = BetterPlayer(frame: .zero)
             applyBufferingConfiguration(call.arguments as? [String: Any], to: player)
@@ -282,7 +292,9 @@ extension BetterPlayerPlugin {
             setRemoteCommandsNotificationNotActive()
             players.removeValue(forKey: textureId)
             dataSourceDict.removeValue(forKey: textureId)
-            if players.isEmpty { try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation]) }
+            if managesAudioSession && players.isEmpty {
+                try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+            }
             result(nil)
         case "setLooping":
             if let looping = (argsMap["looping"] as? NSNumber)?.boolValue { player.isLooping = looping }
