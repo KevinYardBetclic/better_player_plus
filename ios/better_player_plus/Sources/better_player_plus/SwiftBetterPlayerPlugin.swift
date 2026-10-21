@@ -234,8 +234,12 @@ extension BetterPlayerPlugin {
             return
         }
         if call.method == "setManagesAudioSession" {
-            let argsMap = call.arguments as? [String: Any]
-            managesAudioSession = (argsMap?["managesAudioSession"] as? NSNumber)?.boolValue ?? true
+            // A malformed call keeps the current owner rather than silently handing the session back.
+            guard let managesAudioSession = ((call.arguments as? [String: Any])?["managesAudioSession"] as? NSNumber)?.boolValue else {
+                result(FlutterError(code: "INVALID_ARGUMENT", message: "setManagesAudioSession expects a managesAudioSession bool", details: nil))
+                return
+            }
+            self.managesAudioSession = managesAudioSession
             for (_, player) in players { player.managesAudioSession = managesAudioSession }
             result(nil)
             return
