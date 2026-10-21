@@ -211,6 +211,9 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
     }
 
     private func disposeAllPlayers() {
+        // On a cold start there is nothing to dispose and no session of the plugin's to wind down;
+        // the host may already have activated its own before its first call reaches the plugin.
+        let hadPlayers = !players.isEmpty
         for (_, player) in players {
             player.dispose()
             disposeNotificationData(player)
@@ -219,7 +222,7 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
         dataSourceDict.removeAll()
         timeObserverIdDict.removeAll()
         artworkImageDict.removeAll()
-        setRemoteCommandsNotificationNotActive()
+        if hadPlayers { setRemoteCommandsNotificationNotActive() }
     }
 }
 
