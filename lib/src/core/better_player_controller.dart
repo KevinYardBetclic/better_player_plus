@@ -1175,7 +1175,8 @@ class BetterPlayerController {
   /// deactivation off the main thread. The plugin then never sets the category
   /// nor activates or deactivates the session, and the app must activate a
   /// `.playback` session before relying on background audio or
-  /// picture-in-picture.
+  /// picture-in-picture. [setMixWithOthers] then does nothing either, since
+  /// mixing is a category option the app now sets itself.
   ///
   /// Only affects iOS; on Android it completes without doing anything.
   static Future<void> setManagesAudioSession(bool managesAudioSession) =>
