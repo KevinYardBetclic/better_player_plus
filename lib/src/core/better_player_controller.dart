@@ -1162,8 +1162,12 @@ class BetterPlayerController {
   ///clear the cache.
   Future<void> clearCache() => VideoPlayerController.clearCache();
 
-  /// Sets whether the plugin owns the platform audio session, for every player
-  /// created from now on and every player already alive.
+  /// Sets whether the plugin owns the platform audio session.
+  ///
+  /// The choice applies at once to activating and deactivating the session,
+  /// for every player already alive and every player created from now on. The
+  /// category, set when a player is created, is only applied again by the
+  /// players created after the plugin takes the session back.
   ///
   /// By default (`true`) the plugin configures the iOS `AVAudioSession` itself:
   /// it sets a non-mixable `.playback` category whenever a player is created,
