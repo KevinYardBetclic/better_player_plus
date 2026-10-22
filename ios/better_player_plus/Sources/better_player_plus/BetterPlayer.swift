@@ -20,6 +20,14 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     public private(set) var disposed: Bool = false
     public private(set) var isPlaying: Bool = false
     public var isLooping: Bool = false
+    /// Whether iOS may move this player into picture-in-picture on its own as the app goes to the
+    /// background. Picture-in-picture asked for explicitly works either way.
+    public var startsPictureInPictureAutomatically: Bool = true {
+        didSet {
+            guard #available(iOS 14.2, *), let pip = pipController, !pip.isPictureInPictureActive else { return }
+            pip.canStartPictureInPictureAutomaticallyFromInline = startsPictureInPictureAutomatically
+        }
+    }
     public private(set) var isInitialized: Bool = false
     public private(set) var key: String? = nil
     public private(set) var failedCount: Int = 0
@@ -579,7 +587,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
             pipController?.delegate = self
         }
         if #available(iOS 14.2, *) {
-            pipController?.canStartPictureInPictureAutomaticallyFromInline = true
+            pipController?.canStartPictureInPictureAutomaticallyFromInline = startsPictureInPictureAutomatically
         }
     }
 

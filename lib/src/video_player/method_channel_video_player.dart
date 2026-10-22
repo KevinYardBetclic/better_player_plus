@@ -191,6 +191,10 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   Future<void> clearCache() => _channel.invokeMethod<void>('clearCache', <String, dynamic>{});
 
   @override
+  Future<void> setAutomaticPictureInPicture(bool enabled) =>
+      _channel.invokeMethod<void>('setAutomaticPictureInPicture', <String, dynamic>{'enabled': enabled});
+
+  @override
   Future<void> preCache(DataSource dataSource, int preCacheSize) {
     final Map<String, dynamic> dataSourceDescription = <String, dynamic>{
       'key': dataSource.key,

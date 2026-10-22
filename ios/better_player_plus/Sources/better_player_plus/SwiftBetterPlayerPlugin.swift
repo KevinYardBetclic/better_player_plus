@@ -17,6 +17,9 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
     private var texturesCount: Int64 = -1
     private var notificationPlayer: BetterPlayer?
     private var remoteCommandsInitialized = false
+    // When false, iOS never moves a player into picture-in-picture on its own; only an explicit
+    // request opens the window.
+    private var startsPictureInPictureAutomatically = true
 
     init(registrar: FlutterPluginRegistrar) {
         self.messenger = registrar.messenger()
@@ -58,6 +61,7 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
     private func onPlayerSetup(_ player: BetterPlayer, result: FlutterResult) {
         let textureId = newTextureId()
         let eventChannel = FlutterEventChannel(name: "better_player_channel/videoEvents\(textureId)", binaryMessenger: messenger)
+        player.startsPictureInPictureAutomatically = startsPictureInPictureAutomatically
         player.setMixWithOthers(false)
         eventChannel.setStreamHandler(player)
         player.eventChannel = eventChannel
@@ -224,6 +228,17 @@ extension BetterPlayerPlugin {
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         if call.method == "init" {
             disposeAllPlayers()
+            result(nil)
+            return
+        }
+        if call.method == "setAutomaticPictureInPicture" {
+            // A malformed call keeps the current setting rather than silently re-enabling automatic entry.
+            guard let enabled = ((call.arguments as? [String: Any])?["enabled"] as? NSNumber)?.boolValue else {
+                result(FlutterError(code: "INVALID_ARGUMENT", message: "setAutomaticPictureInPicture expects an enabled bool", details: nil))
+                return
+            }
+            startsPictureInPictureAutomatically = enabled
+            for (_, player) in players { player.startsPictureInPictureAutomatically = enabled }
             result(nil)
             return
         }
