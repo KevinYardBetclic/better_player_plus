@@ -638,6 +638,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   static Future<void> setManagesAudioSession(bool managesAudioSession) =>
       _videoPlayerPlatform.setManagesAudioSession(managesAudioSession);
 
+  /// Sets whether iOS may start picture-in-picture on its own. See
+  /// [BetterPlayerController.setAutomaticPictureInPicture].
+  static Future<void> setAutomaticPictureInPicture(bool enabled) =>
+      _videoPlayerPlatform.setAutomaticPictureInPicture(enabled);
+
   static Future<void> preCache(DataSource dataSource, int preCacheSize) =>
       _videoPlayerPlatform.preCache(dataSource, preCacheSize);
 

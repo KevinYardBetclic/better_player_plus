@@ -1186,6 +1186,20 @@ class BetterPlayerController {
   static Future<void> setManagesAudioSession(bool managesAudioSession) =>
       VideoPlayerController.setManagesAudioSession(managesAudioSession);
 
+  /// Sets whether iOS may move a playing video into picture-in-picture on its
+  /// own as the app goes to the background, for every player already alive and
+  /// every player created from now on.
+  ///
+  /// By default (`true`) every player arms automatic entry
+  /// (`canStartPictureInPictureAutomaticallyFromInline`) as soon as it is shown
+  /// or played, so leaving the app with a video playing opens a
+  /// picture-in-picture window. Pass `false` when picture-in-picture must only
+  /// open on an explicit [enablePictureInPicture] call, which keeps working.
+  ///
+  /// Only affects iOS; on Android it completes without doing anything.
+  static Future<void> setAutomaticPictureInPicture(bool enabled) =>
+      VideoPlayerController.setAutomaticPictureInPicture(enabled);
+
   ///Build headers map that will be used to setup video player controller. Apply
   ///DRM headers if available.
   Map<String, String?> _getHeaders() {

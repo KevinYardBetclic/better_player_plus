@@ -170,6 +170,12 @@ abstract class VideoPlayerPlatform {
     throw UnimplementedError('setManagesAudioSession() has not been implemented.');
   }
 
+  /// Sets whether iOS may start picture-in-picture on its own. See
+  /// [BetterPlayerController.setAutomaticPictureInPicture].
+  Future<void> setAutomaticPictureInPicture(bool enabled) {
+    throw UnimplementedError('setAutomaticPictureInPicture() has not been implemented.');
+  }
+
   /// Returns a widget displaying the video with a given textureID.
   Widget buildView(int? textureId) {
     throw UnimplementedError('buildView() has not been implemented.');
