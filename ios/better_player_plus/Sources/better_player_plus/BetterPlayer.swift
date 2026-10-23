@@ -24,8 +24,12 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     /// background. Picture-in-picture asked for explicitly works either way.
     public var startsPictureInPictureAutomatically: Bool = true {
         didSet {
-            guard #available(iOS 14.2, *), let pip = pipController, !pip.isPictureInPictureActive else { return }
-            pip.canStartPictureInPictureAutomaticallyFromInline = startsPictureInPictureAutomatically
+            guard pipController?.isPictureInPictureActive != true else { return }
+            if startsPictureInPictureAutomatically {
+                armPictureInPicture()
+            } else {
+                releaseIdlePictureInPicture()
+            }
         }
     }
     public private(set) var isInitialized: Bool = false
@@ -53,6 +57,8 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     public var lastAvPlayerTimeControlStatus: AVPlayer.TimeControlStatus? = nil
 
     private var pipController: AVPictureInPictureController?
+    /// Waits for a freshly built controller to become usable before starting the session asked for.
+    private var pipPossibleObservation: NSKeyValueObservation?
     private var restoreUIOnPipStop: ((Bool) -> Void)?
     /// Invalidates a pending background-pause check when a newer one supersedes it.
     private var backgroundPauseGeneration = 0
@@ -536,10 +542,59 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         self.pictureInPicture = pictureInPicture
         guard let pip = pipController else { return }
         if pictureInPicture, !pip.isPictureInPictureActive {
-            DispatchQueue.main.async { pip.startPictureInPicture() }
-        } else if !pictureInPicture, pip.isPictureInPictureActive {
-            DispatchQueue.main.async { pip.stopPictureInPicture() }
+            startPictureInPictureWhenPossible(pip)
+        } else if !pictureInPicture {
+            cancelPendingPictureInPictureStart()
+            if pip.isPictureInPictureActive {
+                DispatchQueue.main.async { pip.stopPictureInPicture() }
+            } else if !startsPictureInPictureAutomatically {
+                releaseIdlePictureInPicture()
+            }
         }
+    }
+
+    /// Starts the session once AVKit reports it possible: a controller built on the request is not
+    /// usable straight away, and starting it early fails silently. Gives up after
+    /// `pictureInPictureStartTimeout` rather than opening the window long after the tap.
+    private func startPictureInPictureWhenPossible(_ pip: AVPictureInPictureController) {
+        cancelPendingPictureInPictureStart()
+        if pip.isPictureInPicturePossible {
+            DispatchQueue.main.async { pip.startPictureInPicture() }
+            return
+        }
+        pipPossibleObservation = pip.observe(\.isPictureInPicturePossible, options: [.new]) { [weak self] pip, _ in
+            guard pip.isPictureInPicturePossible else { return }
+            DispatchQueue.main.async {
+                guard let self, self.pipController === pip, self.pipPossibleObservation != nil else { return }
+                self.cancelPendingPictureInPictureStart()
+                guard self.pictureInPicture, !pip.isPictureInPictureActive else { return }
+                pip.startPictureInPicture()
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + pictureInPictureStartTimeout) { [weak self, weak pip] in
+            guard let self, let pip, self.pipController === pip, self.pipPossibleObservation != nil else { return }
+            self.cancelPendingPictureInPictureStart()
+            guard !pip.isPictureInPictureActive else { return }
+            self.pictureInPicture = false
+            if !self.startsPictureInPictureAutomatically { self.releaseIdlePictureInPicture() }
+        }
+    }
+
+    private let pictureInPictureStartTimeout: TimeInterval = 3
+
+    private func cancelPendingPictureInPictureStart() {
+        pipPossibleObservation?.invalidate()
+        pipPossibleObservation = nil
+    }
+
+    /// Drops a controller no session is using. With automatic entry off, an idle controller on a
+    /// playing layer is all iOS 26 needs to open the window as the app leaves, whatever
+    /// `canStartPictureInPictureAutomaticallyFromInline` says — so none is kept between requests.
+    private func releaseIdlePictureInPicture() {
+        guard let pip = pipController, !pip.isPictureInPictureActive else { return }
+        cancelPendingPictureInPictureStart()
+        pipController = nil
+        pip.delegate = nil
     }
 
     public func setRestoreUserInterfaceForPIPStopCompletionHandler(_ restore: Bool) {
@@ -582,6 +637,9 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         // Never swap the controller out from under a live PiP session — that would
         // orphan the window the viewer is watching.
         if pipController?.isPictureInPictureActive == true { return }
+        // With automatic entry off, only a session asked for holds a controller: see
+        // releaseIdlePictureInPicture().
+        guard startsPictureInPictureAutomatically || pictureInPicture else { return }
         if pipController == nil || pipController?.playerLayer !== layer {
             pipController = AVPictureInPictureController(playerLayer: layer)
             pipController?.delegate = self
@@ -595,6 +653,8 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         // `frame` is ignored: the layer is the Flutter platform view, so Flutter
         // already owns its geometry. The parameter stays for channel compatibility.
         try? AVAudioSession.sharedInstance().setActive(true)
+        // Set before arming: with automatic entry off, the request is what lets a controller exist.
+        pictureInPicture = true
         armPictureInPicture()
         setPictureInPicture(true)
     }
@@ -637,6 +697,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     /// the app with the video still playing after the viewer navigated away.
     /// Detaching the player from the layer is what genuinely closes the window.
     private func tearDownPictureInPicture() {
+        cancelPendingPictureInPictureStart()
         guard let pip = pipController else { return }
         pictureInPicture = false
         pipController = nil
@@ -658,6 +719,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         // the PiP window froze and returning to the app crashed.
         pictureInPicture = false
         eventSink?(["event": "pipStop"])
+        if !startsPictureInPictureAutomatically { releaseIdlePictureInPicture() }
     }
 
     public func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {

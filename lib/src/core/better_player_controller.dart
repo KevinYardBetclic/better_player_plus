@@ -1172,6 +1172,11 @@ class BetterPlayerController {
   /// picture-in-picture window. Pass `false` when picture-in-picture must only
   /// open on an explicit [enablePictureInPicture] call, which keeps working.
   ///
+  /// With `false`, a player holds no picture-in-picture controller between
+  /// requests: iOS 26 opens the window for any controller attached to a
+  /// playing layer, whatever its automatic-entry flag says. The controller is
+  /// built on the request, so the window can take a moment longer to open.
+  ///
   /// Only affects iOS; on Android it completes without doing anything.
   static Future<void> setAutomaticPictureInPicture(bool enabled) =>
       VideoPlayerController.setAutomaticPictureInPicture(enabled);
