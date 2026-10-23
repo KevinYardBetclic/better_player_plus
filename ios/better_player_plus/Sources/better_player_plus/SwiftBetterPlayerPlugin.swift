@@ -356,6 +356,8 @@ extension BetterPlayerPlugin {
                 result(NSNumber(value: true)); return
             }
             result(NSNumber(value: false))
+        case "pictureInPictureState":
+            result(player.pictureInPictureState())
         case "disablePictureInPicture":
             player.disablePictureInPicture(); player.setPictureInPicture(false); result(nil)
         case "setAudioTrack":

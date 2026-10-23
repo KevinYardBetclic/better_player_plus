@@ -619,6 +619,14 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     return _videoPlayerPlatform.isPictureInPictureEnabled(_textureId);
   }
 
+  /// Diagnostic, iOS only: what governs whether iOS opens the picture-in-picture window on its own.
+  Future<Map<String, Object?>?> pictureInPictureState() async {
+    if (_textureId == null) {
+      return null;
+    }
+    return _videoPlayerPlatform.pictureInPictureState(_textureId);
+  }
+
   void refresh() {
     value = value.copyWith();
   }
