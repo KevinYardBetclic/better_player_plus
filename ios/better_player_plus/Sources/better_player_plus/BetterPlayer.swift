@@ -26,7 +26,10 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     /// background. Picture-in-picture asked for explicitly works either way.
     public var startsPictureInPictureAutomatically: Bool = true {
         didSet {
-            guard pipController?.isPictureInPictureActive != true else { return }
+            // The plugin re-applies the setting to every live player on each call.
+            guard startsPictureInPictureAutomatically != oldValue, pipController?.isPictureInPictureActive != true else {
+                return
+            }
             if startsPictureInPictureAutomatically {
                 armPictureInPicture()
             } else {
@@ -629,7 +632,9 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     /// playing layer is all iOS 26 needs to open the window as the app leaves, whatever
     /// `canStartPictureInPictureAutomaticallyFromInline` says — so none is kept between requests.
     private func releaseIdlePictureInPicture() {
-        guard let pip = pipController, !pip.isPictureInPictureActive else { return }
+        // A requested session still waiting for AVKit is not idle: dropping its controller would
+        // cancel the request without a word to the app.
+        guard !pictureInPicture, let pip = pipController, !pip.isPictureInPictureActive else { return }
         cancelPendingPictureInPictureStart()
         pipController = nil
         pip.delegate = nil
