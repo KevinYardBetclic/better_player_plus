@@ -56,4 +56,6 @@ automatic entry off, once, before creating the first player:
 ```dart
 BetterPlayerController.setAutomaticPictureInPicture(false)
 ```
-On Android the call does nothing.
+The window then takes a moment longer to open on request: the player keeps no picture-in-picture
+controller in between, since iOS 26 opens the window for any controller on a playing video. On
+Android the call does nothing.
