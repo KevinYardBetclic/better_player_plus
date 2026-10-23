@@ -67,8 +67,6 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     private var restoreUIOnPipStop: ((Bool) -> Void)?
     /// Invalidates a pending background-pause check when a newer one supersedes it.
     private var backgroundPauseGeneration = 0
-    /// Diagnostic: the picture-in-picture state as the app last started to leave.
-    private var pictureInPictureStateAtResignActive: [String: Any]?
 
     public override init() {
         self.player = AVPlayer()
@@ -87,40 +85,6 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
             name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(onWillResignActive),
-            name: UIApplication.willResignActiveNotification,
-            object: nil
-        )
-    }
-
-    @objc private func onWillResignActive() {
-        pictureInPictureStateAtResignActive = currentPictureInPictureState()
-    }
-
-    /// Diagnostic: what governs whether iOS opens the picture-in-picture window on its own, now and
-    /// as the app last started to leave.
-    public func pictureInPictureState() -> [String: Any] {
-        var state = currentPictureInPictureState()
-        if let atResignActive = pictureInPictureStateAtResignActive { state["atResignActive"] = atResignActive }
-        return state
-    }
-
-    private func currentPictureInPictureState() -> [String: Any] {
-        var state: [String: Any] = [
-            "systemVersion": UIDevice.current.systemVersion,
-            "startsAutomatically": startsPictureInPictureAutomatically,
-            "hasController": pipController != nil,
-            "isActive": pipController?.isPictureInPictureActive ?? false,
-            "isPossible": pipController?.isPictureInPicturePossible ?? false,
-            "controllerOnDisplayLayer": pipController != nil && pipController?.playerLayer === displayLayer,
-            "isPlaying": isPlaying,
-        ]
-        if #available(iOS 14.2, *), let pip = pipController {
-            state["canStartAutomatically"] = pip.canStartPictureInPictureAutomaticallyFromInline
-        }
-        return state
     }
 
     public convenience init(frame: CGRect) {

@@ -172,10 +172,6 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
       _channel.invokeMethod<bool>('isPictureInPictureSupported', <String, dynamic>{'textureId': textureId});
 
   @override
-  Future<Map<String, Object?>?> pictureInPictureState(int? textureId) =>
-      _channel.invokeMapMethod<String, Object?>('pictureInPictureState', <String, dynamic>{'textureId': textureId});
-
-  @override
   Future<void> disablePictureInPicture(int? textureId) =>
       _channel.invokeMethod<bool>('disablePictureInPicture', <String, dynamic>{'textureId': textureId});
 

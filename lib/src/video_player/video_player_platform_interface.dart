@@ -152,11 +152,6 @@ abstract class VideoPlayerPlatform {
     throw UnimplementedError('isPictureInPictureEnabled() has not been implemented.');
   }
 
-  /// Diagnostic: what governs whether iOS opens the picture-in-picture window on its own.
-  Future<Map<String, Object?>?> pictureInPictureState(int? textureId) {
-    throw UnimplementedError('pictureInPictureState() has not been implemented.');
-  }
-
   Future<void> setAudioTrack(int? textureId, String? name, int? index) {
     throw UnimplementedError('setAudio() has not been implemented.');
   }
