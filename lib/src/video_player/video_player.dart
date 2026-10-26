@@ -401,7 +401,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       return;
     }
 
-    value = VideoPlayerValue(duration: null, isLooping: value.isLooping, volume: value.volume);
+    // The crop is kept: the platform only reports it when it changes, so a new source cut the same
+    // way would otherwise leave the padding on screen.
+    value = VideoPlayerValue(duration: null, isLooping: value.isLooping, volume: value.volume, crop: value.crop);
 
     if (!_creatingCompleter.isCompleted) {
       await _creatingCompleter.future;
