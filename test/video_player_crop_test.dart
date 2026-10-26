@@ -76,6 +76,25 @@ void main() {
     });
   });
 
+  group('A source swapped in place for one cut the same way', () {
+    testWidgets('keeps the padding out of the player, though the platform does not report the crop again', (
+      WidgetTester tester,
+    ) async {
+      final VideoPlayerController controller = await pumpPlayer(tester);
+      await tester.runAsync(
+        () =>
+            reportFromPlatform(<String, Object>{'event': 'crop', 'left': 0, 'top': 0, 'right': 1, 'bottom': 396 / 416}),
+      );
+
+      await tester.runAsync(() => controller.setNetworkDataSource('https://example.com/live.m3u8?token=fresh'));
+      await tester.pump();
+
+      expect(tester.getSize(find.byType(Texture)), const Size(704, 416));
+
+      await tester.runAsync(controller.dispose);
+    });
+  });
+
   group('A platform whose frames are all picture', () {
     testWidgets('shows the frame as it is', (WidgetTester tester) async {
       final VideoPlayerController controller = await pumpPlayer(tester);
