@@ -1,4 +1,5 @@
 export 'src/asms/better_player_asms_audio_track.dart';
+export 'src/video_player/debug_pip_log.dart';
 export 'src/asms/better_player_asms_data_holder.dart';
 export 'src/asms/better_player_asms_subtitle.dart';
 export 'src/asms/better_player_asms_subtitle_segment.dart';

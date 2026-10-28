@@ -26,6 +26,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     /// background. Picture-in-picture asked for explicitly works either way.
     public var startsPictureInPictureAutomatically: Bool = true {
         didSet {
+            debugPip("native autoPiP didSet old=\(oldValue) new=\(startsPictureInPictureAutomatically) pipActive=\(pipController?.isPictureInPictureActive == true) hasController=\(pipController != nil)")
             // The plugin re-applies the setting to every live player on each call.
             guard startsPictureInPictureAutomatically != oldValue, pipController?.isPictureInPictureActive != true else {
                 return
@@ -85,6 +86,23 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
             name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onWillResignActiveDebug),
+            name: UIApplication.willResignActiveNotification,
+            object: nil
+        )
+    }
+
+    private func debugPip(_ message: String) {
+        NSLog("DEBUGPIP %@", message)
+        eventSink?(["event": "debugPip", "message": message])
+    }
+
+    @objc private func onWillResignActiveDebug() {
+        var line = "native willResignActive isPlaying=\(isPlaying) rate=\(player.rate) hasController=\(pipController != nil) possible=\(pipController?.isPictureInPicturePossible == true) active=\(pipController?.isPictureInPictureActive == true) layerInWindow=\([playerView, previousPlayerView].compactMap(\.self).contains { $0.window != nil }) category=\(AVAudioSession.sharedInstance().category.rawValue) options=\(AVAudioSession.sharedInstance().categoryOptions.rawValue) otherAudio=\(AVAudioSession.sharedInstance().isOtherAudioPlaying) controllerOnDisplayLayer=\(pipController != nil && pipController?.playerLayer === displayLayer) controllerLayerInWindow=\(pipController?.playerLayer.superlayer != nil)"
+        if #available(iOS 14.2, *) { line += " canStartAuto=\(pipController?.canStartPictureInPictureAutomaticallyFromInline == true)" }
+        debugPip(line)
     }
 
     public convenience init(frame: CGRect) {
@@ -480,6 +498,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     }
 
     public func pause() {
+        debugPip("native pause() appState=\(UIApplication.shared.applicationState.rawValue)")
         NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(startStalledCheckObjC), object: nil)
         isStalledCheckStarted = false
         stalledCount = 0
@@ -548,6 +567,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     }
 
     public func setPictureInPicture(_ pictureInPicture: Bool) {
+        debugPip("native setPictureInPicture(\(pictureInPicture)) active=\(pipController?.isPictureInPictureActive == true)")
         self.pictureInPicture = pictureInPicture
         guard let pip = pipController else { return }
         if pictureInPicture, !pip.isPictureInPictureActive {
@@ -604,6 +624,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         // cancel the request without a word to the app.
         guard !pictureInPicture, let pip = pipController, !pip.isPictureInPictureActive else { return }
         cancelPendingPictureInPictureStart()
+        debugPip("native releaseIdle -> controller dropped")
         pipController = nil
         pip.delegate = nil
     }
@@ -644,14 +665,22 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     ///   old code built the controller 0.2s after the button press — can never
     ///   produce background PiP.
     private func armPictureInPicture() {
-        guard AVPictureInPictureController.isPictureInPictureSupported(), let layer = displayLayer else { return }
+        debugPip("native arm auto=\(startsPictureInPictureAutomatically) requested=\(pictureInPicture) hasLayer=\(displayLayer != nil) layerInWindow=\([playerView, previousPlayerView].compactMap(\.self).contains { $0.window != nil }) hasController=\(pipController != nil) active=\(pipController?.isPictureInPictureActive == true)")
+        guard AVPictureInPictureController.isPictureInPictureSupported(), let layer = displayLayer else {
+            debugPip("native arm -> skipped supported=\(AVPictureInPictureController.isPictureInPictureSupported())")
+            return
+        }
         // Never swap the controller out from under a live PiP session — that would
         // orphan the window the viewer is watching.
         if pipController?.isPictureInPictureActive == true { return }
         // With automatic entry off, only a session asked for holds a controller: see
         // releaseIdlePictureInPicture().
-        guard startsPictureInPictureAutomatically || pictureInPicture else { return }
+        guard startsPictureInPictureAutomatically || pictureInPicture else {
+            debugPip("native arm -> skipped (auto off, not requested)")
+            return
+        }
         if pipController == nil || pipController?.playerLayer !== layer {
+            debugPip("native arm -> new controller (hadController=\(pipController != nil))")
             pipController = AVPictureInPictureController(playerLayer: layer)
             pipController?.delegate = self
         }
@@ -687,6 +716,8 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     /// than `didEnterBackground`. `backgroundPauseGeneration` drops a stale check if
     /// another background transition lands first.
     @objc private func onDidEnterBackground() {
+        debugPip("native didEnterBackground isPlaying=\(isPlaying) rate=\(player.rate) hasController=\(pipController != nil) possible=\(pipController?.isPictureInPicturePossible == true) active=\(pipController?.isPictureInPictureActive == true) layerInWindow=\([playerView, previousPlayerView].compactMap(\.self).contains { $0.window != nil }) category=\(AVAudioSession.sharedInstance().category.rawValue) options=\(AVAudioSession.sharedInstance().categoryOptions.rawValue) controllerOnDisplayLayer=\(pipController != nil && pipController?.playerLayer === displayLayer) controllerLayerInWindow=\(pipController?.playerLayer.superlayer != nil)")
+        if #available(iOS 14.2, *) { debugPip("native canStartAuto=\(pipController?.canStartPictureInPictureAutomaticallyFromInline == true)") }
         guard isPlaying, !disposed else { return }
         backgroundPauseGeneration += 1
         let generation = backgroundPauseGeneration
@@ -694,7 +725,9 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
             guard let self, !self.disposed, generation == self.backgroundPauseGeneration else { return }
             // Back in the foreground already, or PiP took over: nothing to do.
             guard UIApplication.shared.applicationState == .background else { return }
+            debugPip("native +0.5s background check active=\(self.pipController?.isPictureInPictureActive == true)")
             guard self.pipController?.isPictureInPictureActive != true else { return }
+            debugPip("native background pause (no PiP)")
             self.pause()
             self.eventSink?(["event": "pause"])
         }
@@ -723,7 +756,16 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     }
 
     // MARK: - AVPictureInPictureControllerDelegate
+    public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
+        debugPip("native FAILED to start: \(error)")
+    }
+
+    public func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        debugPip("native willStart")
+    }
+
     public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        debugPip("native didStop auto=\(startsPictureInPictureAutomatically) controllerOnDisplayLayer=\(pipController != nil && pipController?.playerLayer === displayLayer) controllerLayerInWindow=\(pipController?.playerLayer.superlayer != nil)")
         // Record the state and report it — nothing more. The old code called
         // disablePictureInPicture() here, which (because that method used to
         // *start* PiP) restarted the session while its layer was being torn down:
@@ -734,6 +776,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     }
 
     public func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        debugPip("native didStart")
         pictureInPicture = true
         eventSink?(["event": "pipStart"])
     }

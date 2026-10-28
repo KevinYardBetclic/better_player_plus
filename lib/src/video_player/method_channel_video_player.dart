@@ -1,6 +1,7 @@
 // Platform channel method signatures require dynamic parameter types
 // ignore_for_file: avoid_annotating_with_dynamic
 
+import 'package:better_player_plus/src/video_player/debug_pip_log.dart';
 import 'dart:async';
 
 import 'package:better_player_plus/src/configuration/better_player_buffering_configuration.dart';
@@ -302,6 +303,9 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
               ),
             );
 
+          case 'debugPip':
+            betterPlayerDebugPipLog?.call(map['message'] as String? ?? '');
+            return VideoEvent(eventType: VideoEventType.unknown, key: key);
           default:
             return VideoEvent(eventType: VideoEventType.unknown, key: key);
         }
