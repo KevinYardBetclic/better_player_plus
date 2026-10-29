@@ -621,6 +621,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         DispatchQueue.main.asyncAfter(deadline: .now() + pictureInPictureStopTimeout) { [weak self, weak pip] in
             guard let self, let pip, self.pipController === pip, !self.pictureInPicture else { return }
             guard pip.isPictureInPictureActive, self.layerDetachedToClosePictureInPicture == nil else { return }
+            self.debugPip("native stop ignored -> detaching player to close the window")
             self.layerDetachedToClosePictureInPicture = pip.playerLayer
             pip.playerLayer.player = nil
             // Should the window never report it closed, the stream must not stay without a layer.
@@ -633,6 +634,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     private func reattachLayerDetachedToClosePictureInPicture() {
         guard let layer = layerDetachedToClosePictureInPicture else { return }
         layerDetachedToClosePictureInPicture = nil
+        debugPip("native reattach player after forced close disposed=\(disposed) active=\(pipController?.isPictureInPictureActive == true)")
         if !disposed { layer.player = player }
     }
 
