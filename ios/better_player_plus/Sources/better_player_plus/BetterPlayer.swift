@@ -809,7 +809,10 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         pictureInPicture = false
         reattachLayerDetachedToClosePictureInPicture()
         eventSink?(["event": "pipStop"])
-        if !startsPictureInPictureAutomatically { releaseIdlePictureInPicture() }
+        releaseIdlePictureInPicture()
+        // A controller that has served a window is not armed again by iOS: the next automatic start
+        // needs a fresh one, on the layer now on screen.
+        if startsPictureInPictureAutomatically { armPictureInPicture() }
     }
 
     public func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
