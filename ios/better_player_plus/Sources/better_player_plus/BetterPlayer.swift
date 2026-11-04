@@ -650,6 +650,11 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         // the PiP window froze and returning to the app crashed.
         pictureInPicture = false
         eventSink?(["event": "pipStop"])
+        // A controller that has served a window is not armed again by iOS: the next automatic start
+        // needs a fresh one, on the layer now on screen.
+        pipController?.delegate = nil
+        pipController = nil
+        armPictureInPicture()
     }
 
     public func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
