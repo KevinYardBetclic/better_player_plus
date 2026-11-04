@@ -92,6 +92,12 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
             name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
     }
 
     public convenience init(frame: CGRect) {
@@ -618,6 +624,9 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         cancelPendingPictureInPictureStart()
         pipController = nil
         pip.delegate = nil
+        if #available(iOS 14.2, *) {
+            pip.canStartPictureInPictureAutomaticallyFromInline = false
+        }
     }
 
     private static let pictureInPictureStopGrace: TimeInterval = 0.3
@@ -800,6 +809,23 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     /// so the request can simply be dropped — leaving the PiP window floating over
     /// the app with the video still playing after the viewer navigated away.
     /// Detaching the player from the layer is what genuinely closes the window.
+    /// Set when a served controller was replaced while the app was not active.
+    private var rearmsPictureInPictureOnActive = false
+
+    /// A controller that has served a window is not armed again by iOS: the next automatic start needs
+    /// a fresh one, on the layer now on screen.
+    private func rearmPictureInPicture() {
+        releaseIdlePictureInPicture()
+        if startsPictureInPictureAutomatically { armPictureInPicture() }
+    }
+
+    @objc private func onDidBecomeActive() {
+        guard rearmsPictureInPictureOnActive, !disposed else { return }
+
+        rearmsPictureInPictureOnActive = false
+        rearmPictureInPicture()
+    }
+
     private func tearDownPictureInPicture() {
         cancelPendingPictureInPictureStart()
         guard let pip = pipController else { return }
@@ -822,17 +848,16 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
 
     public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         pictureInPictureStopping = false
-        // Record the state and report it — nothing more. The old code called
-        // disablePictureInPicture() here, which (because that method used to
-        // *start* PiP) restarted the session while its layer was being torn down:
-        // the PiP window froze and returning to the app crashed.
+        // Nothing here may start a session again: calling disablePictureInPicture() here, which
+        // used to *start* PiP, restarted the session while its layer was being torn down — the PiP
+        // window froze and returning to the app crashed. Building a fresh controller is fine.
         pictureInPicture = false
         reattachLayerDetachedToClosePictureInPicture()
         eventSink?(["event": "pipStop"])
-        releaseIdlePictureInPicture()
-        // A controller that has served a window is not armed again by iOS: the next automatic start
-        // needs a fresh one, on the layer now on screen.
-        if startsPictureInPictureAutomatically { armPictureInPicture() }
+        rearmPictureInPicture()
+        // A window closed from the home screen leaves the app in the background, where the layer is not
+        // on screen: the controller is built again once the app is back.
+        rearmsPictureInPictureOnActive = UIApplication.shared.applicationState != .active
     }
 
     public func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
