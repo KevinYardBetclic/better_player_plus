@@ -46,6 +46,8 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
 
     private var pipController: AVPictureInPictureController?
     private var restoreUIOnPipStop: ((Bool) -> Void)?
+    /// The layer whose player was detached to close a window `stopPictureInPicture()` left open.
+    private var layerDetachedToClosePictureInPicture: AVPlayerLayer?
     /// Invalidates a pending background-pause check when a newer one supersedes it.
     private var backgroundPauseGeneration = 0
 
@@ -531,7 +533,35 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
             DispatchQueue.main.async { pip.startPictureInPicture() }
         } else if !pictureInPicture, pip.isPictureInPictureActive {
             DispatchQueue.main.async { pip.stopPictureInPicture() }
+            closePictureInPictureIfStillOpen(pip)
         }
+    }
+
+    private static let pictureInPictureStopGrace: TimeInterval = 0.3
+    private static let pictureInPictureCloseTimeout: TimeInterval = 3
+
+    /// AVKit ignores `stopPictureInPicture()` for a window it opened on its own, which then stays over
+    /// the app. Detaching the player from the layer is what closes it; the player goes back once the
+    /// window is gone, never before, or the window would pick the stream up again.
+    private func closePictureInPictureIfStillOpen(_ pip: AVPictureInPictureController) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.pictureInPictureStopGrace) { [weak self, weak pip] in
+            guard let self, let pip, self.pipController === pip, !self.pictureInPicture else { return }
+            guard pip.isPictureInPictureActive, self.layerDetachedToClosePictureInPicture == nil else { return }
+
+            self.layerDetachedToClosePictureInPicture = pip.playerLayer
+            pip.playerLayer.player = nil
+            // Should the window never report it closed, the stream must not stay without a layer.
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.pictureInPictureCloseTimeout) { [weak self] in
+                self?.reattachLayerDetachedToClosePictureInPicture()
+            }
+        }
+    }
+
+    private func reattachLayerDetachedToClosePictureInPicture() {
+        guard let layer = layerDetachedToClosePictureInPicture else { return }
+
+        layerDetachedToClosePictureInPicture = nil
+        if !disposed { layer.player = player }
     }
 
     public func setRestoreUserInterfaceForPIPStopCompletionHandler(_ restore: Bool) {
@@ -649,6 +679,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         // *start* PiP) restarted the session while its layer was being torn down:
         // the PiP window froze and returning to the app crashed.
         pictureInPicture = false
+        reattachLayerDetachedToClosePictureInPicture()
         eventSink?(["event": "pipStop"])
     }
 
