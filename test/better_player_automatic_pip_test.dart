@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:better_player_plus/better_player_plus.dart';
+import 'package:better_player_plus/src/video_player/video_player.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,7 +20,7 @@ void main() {
       MethodCall call,
     ) async {
       calls.add(call);
-      return null;
+      return call.method == 'create' ? <String, dynamic>{'textureId': 1} : null;
     });
   });
 
@@ -51,5 +54,51 @@ void main() {
       BetterPlayerController.setAutomaticPictureInPicture(false),
       throwsA(isA<PlatformException>().having((PlatformException error) => error.code, 'code', 'INVALID_ARGUMENT')),
     );
+  });
+
+  group('one player', () {
+    Map<dynamic, dynamic> createArguments() =>
+        calls.singleWhere((MethodCall call) => call.method == 'create').arguments as Map<dynamic, dynamic>;
+
+    test('a player configured without automatic entry is created without it', () async {
+      final controller = BetterPlayerController(
+        const BetterPlayerConfiguration(startsPictureInPictureAutomatically: false),
+      );
+      unawaited(controller.setupDataSource(BetterPlayerDataSource.network('https://example.com/video.mp4')));
+      await pumpEventQueue();
+
+      expect(createArguments()['startsPictureInPictureAutomatically'], false);
+    });
+
+    test('a player configured with nothing follows the plugin-wide setting', () async {
+      final controller = BetterPlayerController(const BetterPlayerConfiguration());
+      unawaited(controller.setupDataSource(BetterPlayerDataSource.network('https://example.com/video.mp4')));
+      await pumpEventQueue();
+
+      expect(createArguments().containsKey('startsPictureInPictureAutomatically'), isFalse);
+    });
+
+    test('turning automatic entry on for one player tells the platform which one', () async {
+      final controller = BetterPlayerController(const BetterPlayerConfiguration());
+      unawaited(controller.setupDataSource(BetterPlayerDataSource.network('https://example.com/video.mp4')));
+      await pumpEventQueue();
+
+      await controller.setStartsPictureInPictureAutomatically(true);
+
+      expect(
+        calls.singleWhere((MethodCall call) => call.method == 'setStartsPictureInPictureAutomatically').arguments,
+        <String, dynamic>{'textureId': 1, 'enabled': true},
+      );
+    });
+
+    test('a request made while the player is being created still reaches it', () async {
+      final player = VideoPlayerController();
+
+      final request = player.setStartsPictureInPictureAutomatically(true);
+      await request;
+
+      final methods = calls.map((MethodCall call) => call.method).toList();
+      expect(methods.indexOf('setStartsPictureInPictureAutomatically'), greaterThan(methods.indexOf('create')));
+    });
   });
 }

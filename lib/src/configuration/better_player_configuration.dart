@@ -43,6 +43,7 @@ class BetterPlayerConfiguration {
     this.autoDispose = true,
     this.expandToFill = true,
     this.useRootNavigator = false,
+    this.startsPictureInPictureAutomatically,
   });
 
   /// Play the video as soon as it's displayed
@@ -158,6 +159,14 @@ class BetterPlayerConfiguration {
   ///Default value is false.
   final bool useRootNavigator;
 
+  /// Whether iOS may move this player into picture-in-picture on its own as the app goes to the
+  /// background. `null` follows [BetterPlayerController.setAutomaticPictureInPicture].
+  ///
+  /// When several players play at once, iOS picks which one moves into the window: leave automatic
+  /// entry on only for the one that should. Change it later with
+  /// [BetterPlayerController.setStartsPictureInPictureAutomatically]. Only affects iOS.
+  final bool? startsPictureInPictureAutomatically;
+
   BetterPlayerConfiguration copyWith({
     double? aspectRatio,
     AspectRatioTypeIOS? aspectRatioIOS,
@@ -189,6 +198,7 @@ class BetterPlayerConfiguration {
     bool? autoDispose,
     bool? expandToFill,
     bool? useRootNavigator,
+    bool? startsPictureInPictureAutomatically,
   }) => BetterPlayerConfiguration(
     aspectRatio: aspectRatio ?? this.aspectRatio,
     autoPlay: autoPlay ?? this.autoPlay,
@@ -220,5 +230,7 @@ class BetterPlayerConfiguration {
     expandToFill: expandToFill ?? this.expandToFill,
     useRootNavigator: useRootNavigator ?? this.useRootNavigator,
     aspectRatioIOS: aspectRatioIOS ?? this.aspectRatioIOS,
+    startsPictureInPictureAutomatically:
+        startsPictureInPictureAutomatically ?? this.startsPictureInPictureAutomatically,
   );
 }

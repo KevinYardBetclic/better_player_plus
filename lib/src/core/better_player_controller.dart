@@ -249,6 +249,7 @@ class BetterPlayerController {
     if (videoPlayerController == null) {
       videoPlayerController = VideoPlayerController(
         bufferingConfiguration: betterPlayerDataSource.bufferingConfiguration,
+        startsPictureInPictureAutomatically: betterPlayerConfiguration.startsPictureInPictureAutomatically,
       );
       videoPlayerController?.addListener(_onVideoPlayerChanged);
     }
@@ -1212,7 +1213,9 @@ class BetterPlayerController {
 
   /// Sets whether iOS may move a playing video into picture-in-picture on its
   /// own as the app goes to the background, for every player already alive and
-  /// every player created from now on.
+  /// every player created from now on — except those given their own setting
+  /// ([BetterPlayerConfiguration.startsPictureInPictureAutomatically],
+  /// [setStartsPictureInPictureAutomatically]).
   ///
   /// By default (`true`) every player arms automatic entry
   /// (`canStartPictureInPictureAutomaticallyFromInline`) as soon as it is shown
@@ -1228,6 +1231,25 @@ class BetterPlayerController {
   /// Only affects iOS; on Android it completes without doing anything.
   static Future<void> setAutomaticPictureInPicture(bool enabled) =>
       VideoPlayerController.setAutomaticPictureInPicture(enabled);
+
+  /// Sets whether iOS may move this player into picture-in-picture on its own
+  /// as the app goes to the background, whatever [setAutomaticPictureInPicture]
+  /// says, which no longer changes it.
+  ///
+  /// When several players play at once, iOS picks which one moves into the
+  /// window, so leave automatic entry on only for the one that should. Set it
+  /// from creation with
+  /// [BetterPlayerConfiguration.startsPictureInPictureAutomatically].
+  ///
+  /// Only affects iOS; on Android it completes without doing anything.
+  Future<void> setStartsPictureInPictureAutomatically(bool enabled) {
+    final controller = videoPlayerController;
+    if (controller == null) {
+      throw StateError('The data source has not been initialized');
+    }
+
+    return controller.setStartsPictureInPictureAutomatically(enabled);
+  }
 
   ///Build headers map that will be used to setup video player controller. Apply
   ///DRM headers if available.

@@ -65,7 +65,10 @@ abstract class VideoPlayerPlatform {
   }
 
   /// Creates an instance of a video player and returns its textureId.
-  Future<int?> create({BetterPlayerBufferingConfiguration? bufferingConfiguration}) {
+  Future<int?> create({
+    BetterPlayerBufferingConfiguration? bufferingConfiguration,
+    bool? startsPictureInPictureAutomatically,
+  }) {
     throw UnimplementedError('create() has not been implemented.');
   }
 
@@ -174,6 +177,12 @@ abstract class VideoPlayerPlatform {
   /// [BetterPlayerController.setAutomaticPictureInPicture].
   Future<void> setAutomaticPictureInPicture(bool enabled) {
     throw UnimplementedError('setAutomaticPictureInPicture() has not been implemented.');
+  }
+
+  /// Sets whether iOS may start picture-in-picture on its own for one player. See
+  /// [BetterPlayerController.setStartsPictureInPictureAutomatically].
+  Future<void> setStartsPictureInPictureAutomatically(int? textureId, bool enabled) {
+    throw UnimplementedError('setStartsPictureInPictureAutomatically() has not been implemented.');
   }
 
   /// Returns a widget displaying the video with a given textureID.

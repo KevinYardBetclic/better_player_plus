@@ -22,16 +22,23 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
       _channel.invokeMethod<void>('dispose', <String, dynamic>{'textureId': textureId});
 
   @override
-  Future<int?> create({BetterPlayerBufferingConfiguration? bufferingConfiguration}) async {
+  Future<int?> create({
+    BetterPlayerBufferingConfiguration? bufferingConfiguration,
+    bool? startsPictureInPictureAutomatically,
+  }) async {
     late final Map<String, dynamic>? response;
-    if (bufferingConfiguration == null) {
+    if (bufferingConfiguration == null && startsPictureInPictureAutomatically == null) {
       response = await _channel.invokeMapMethod<String, dynamic>('create');
     } else {
       final responseLinkedHashMap = await _channel.invokeMethod<Map<Object?, dynamic>?>('create', <String, dynamic>{
-        'minBufferMs': bufferingConfiguration.minBufferMs,
-        'maxBufferMs': bufferingConfiguration.maxBufferMs,
-        'bufferForPlaybackMs': bufferingConfiguration.bufferForPlaybackMs,
-        'bufferForPlaybackAfterRebufferMs': bufferingConfiguration.bufferForPlaybackAfterRebufferMs,
+        if (bufferingConfiguration != null) ...<String, dynamic>{
+          'minBufferMs': bufferingConfiguration.minBufferMs,
+          'maxBufferMs': bufferingConfiguration.maxBufferMs,
+          'bufferForPlaybackMs': bufferingConfiguration.bufferForPlaybackMs,
+          'bufferForPlaybackAfterRebufferMs': bufferingConfiguration.bufferForPlaybackAfterRebufferMs,
+        },
+        if (startsPictureInPictureAutomatically != null)
+          'startsPictureInPictureAutomatically': startsPictureInPictureAutomatically,
       });
 
       response = responseLinkedHashMap != null ? Map<String, dynamic>.from(responseLinkedHashMap) : null;
@@ -199,6 +206,12 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   @override
   Future<void> setAutomaticPictureInPicture(bool enabled) =>
       _channel.invokeMethod<void>('setAutomaticPictureInPicture', <String, dynamic>{'enabled': enabled});
+
+  @override
+  Future<void> setStartsPictureInPictureAutomatically(int? textureId, bool enabled) => _channel.invokeMethod<void>(
+    'setStartsPictureInPictureAutomatically',
+    <String, dynamic>{'textureId': textureId, 'enabled': enabled},
+  );
 
   @override
   Future<void> preCache(DataSource dataSource, int preCacheSize) {
