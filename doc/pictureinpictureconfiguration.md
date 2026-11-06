@@ -59,3 +59,14 @@ BetterPlayerController.setAutomaticPictureInPicture(false)
 The window then takes a moment longer to open on request: the player keeps no picture-in-picture
 controller in between, since iOS 26 opens the window for any controller on a playing video. On
 Android the call does nothing.
+
+When several players play at once, iOS picks which one moves into the window. Give automatic entry
+to the one that should, and keep it off for the others, from creation:
+```dart
+BetterPlayerConfiguration(startsPictureInPictureAutomatically: false)
+```
+or later, on one player:
+```dart
+_betterPlayerController.setStartsPictureInPictureAutomatically(true)
+```
+A player given its own setting keeps it whatever `setAutomaticPictureInPicture` says next.

@@ -262,6 +262,8 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 result.success(null)
             }
 
+            SET_STARTS_PICTURE_IN_PICTURE_AUTOMATICALLY_METHOD -> result.success(null)
+
             DISPOSE_METHOD -> {
                 dispose(player, textureId)
                 result.success(null)
@@ -608,6 +610,7 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         private const val SET_ASPECT_RATIO_METHOD = "setAspectRatio"
         private const val CLEAR_CACHE_METHOD = "clearCache"
         private const val SET_AUTOMATIC_PICTURE_IN_PICTURE_METHOD = "setAutomaticPictureInPicture"
+        private const val SET_STARTS_PICTURE_IN_PICTURE_AUTOMATICALLY_METHOD = "setStartsPictureInPictureAutomatically"
         private const val DISPOSE_METHOD = "dispose"
         private const val PRE_CACHE_METHOD = "preCache"
         private const val STOP_PRE_CACHE_METHOD = "stopPreCache"

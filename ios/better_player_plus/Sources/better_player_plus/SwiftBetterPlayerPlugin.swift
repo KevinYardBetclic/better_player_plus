@@ -20,6 +20,9 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
     // When false, iOS never moves a player into picture-in-picture on its own; only an explicit
     // request opens the window.
     private var startsPictureInPictureAutomatically = true
+    /// The players given their own automatic picture-in-picture setting, which the plugin-wide one no
+    /// longer overrides.
+    private var playersWithOwnAutomaticPictureInPicture: Set<Int64> = []
 
     init(registrar: FlutterPluginRegistrar) {
         self.messenger = registrar.messenger()
@@ -58,10 +61,11 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
         return texturesCount
     }
 
-    private func onPlayerSetup(_ player: BetterPlayer, result: FlutterResult) {
+    private func onPlayerSetup(_ player: BetterPlayer, startsPictureInPictureAutomatically ownSetting: Bool?, result: FlutterResult) {
         let textureId = newTextureId()
         let eventChannel = FlutterEventChannel(name: "better_player_channel/videoEvents\(textureId)", binaryMessenger: messenger)
-        player.startsPictureInPictureAutomatically = startsPictureInPictureAutomatically
+        player.startsPictureInPictureAutomatically = ownSetting ?? startsPictureInPictureAutomatically
+        if ownSetting != nil { playersWithOwnAutomaticPictureInPicture.insert(textureId) }
         player.setMixWithOthers(false)
         eventChannel.setStreamHandler(player)
         player.eventChannel = eventChannel
@@ -218,6 +222,7 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
         }
         players.removeAll()
         dataSourceDict.removeAll()
+        playersWithOwnAutomaticPictureInPicture.removeAll()
         timeObserverIdDict.removeAll()
         artworkImageDict.removeAll()
         setRemoteCommandsNotificationNotActive()
@@ -238,14 +243,18 @@ extension BetterPlayerPlugin {
                 return
             }
             startsPictureInPictureAutomatically = enabled
-            for (_, player) in players { player.startsPictureInPictureAutomatically = enabled }
+            for (textureId, player) in players where !playersWithOwnAutomaticPictureInPicture.contains(textureId) {
+                player.startsPictureInPictureAutomatically = enabled
+            }
             result(nil)
             return
         }
         if call.method == "create" {
             let player = BetterPlayer(frame: .zero)
-            applyBufferingConfiguration(call.arguments as? [String: Any], to: player)
-            onPlayerSetup(player, result: result)
+            let args = call.arguments as? [String: Any]
+            applyBufferingConfiguration(args, to: player)
+            let ownSetting = (args?["startsPictureInPictureAutomatically"] as? NSNumber)?.boolValue
+            onPlayerSetup(player, startsPictureInPictureAutomatically: ownSetting, result: result)
             return
         }
 
@@ -297,6 +306,7 @@ extension BetterPlayerPlugin {
             setRemoteCommandsNotificationNotActive()
             players.removeValue(forKey: textureId)
             dataSourceDict.removeValue(forKey: textureId)
+            playersWithOwnAutomaticPictureInPicture.remove(textureId)
             if players.isEmpty { try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation]) }
             result(nil)
         case "setLooping":
@@ -337,6 +347,15 @@ extension BetterPlayerPlugin {
                 result(NSNumber(value: true)); return
             }
             result(NSNumber(value: false))
+        case "setStartsPictureInPictureAutomatically":
+            // A malformed call keeps the current setting rather than silently re-enabling automatic entry.
+            guard let enabled = (argsMap["enabled"] as? NSNumber)?.boolValue else {
+                result(FlutterError(code: "INVALID_ARGUMENT", message: "setStartsPictureInPictureAutomatically expects an enabled bool", details: nil))
+                return
+            }
+            playersWithOwnAutomaticPictureInPicture.insert(textureId)
+            player.startsPictureInPictureAutomatically = enabled
+            result(nil)
         case "disablePictureInPicture":
             player.disablePictureInPicture(); player.setPictureInPicture(false); result(nil)
         case "setAudioTrack":

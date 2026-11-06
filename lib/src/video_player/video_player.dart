@@ -180,6 +180,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// Constructs a [VideoPlayerController] and creates video controller on platform side.
   new({
     this.bufferingConfiguration = const BetterPlayerBufferingConfiguration(),
+    this.startsPictureInPictureAutomatically,
     bool autoCreate = true,
   }) : super(VideoPlayerValue(duration: null)) {
     if (autoCreate) {
@@ -188,6 +189,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   final BetterPlayerBufferingConfiguration bufferingConfiguration;
+
+  /// See [BetterPlayerConfiguration.startsPictureInPictureAutomatically].
+  final bool? startsPictureInPictureAutomatically;
 
   final StreamController<VideoEvent> videoEventStreamController = StreamController.broadcast();
   final Completer<void> _creatingCompleter = Completer<void>();
@@ -208,7 +212,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   /// Attempts to open the given [dataSource] and load metadata about the video.
   Future<void> _create() async {
-    _textureId = await _videoPlayerPlatform.create(bufferingConfiguration: bufferingConfiguration);
+    _textureId = await _videoPlayerPlatform.create(
+      bufferingConfiguration: bufferingConfiguration,
+      startsPictureInPictureAutomatically: startsPictureInPictureAutomatically,
+    );
     _creatingCompleter.complete(null);
 
     unawaited(_applyLooping());
@@ -629,6 +636,16 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   void setMixWithOthers(bool mixWithOthers) {
     _videoPlayerPlatform.setMixWithOthers(_textureId, mixWithOthers);
+  }
+
+  Future<void> setStartsPictureInPictureAutomatically(bool enabled) async {
+    // A call made while the player is being created must not be lost: it would leave the player on
+    // the setting it was created with.
+    await _creatingCompleter.future;
+    if (_isDisposed) {
+      return;
+    }
+    await _videoPlayerPlatform.setStartsPictureInPictureAutomatically(_textureId, enabled);
   }
 
   static Future<void> clearCache() => _videoPlayerPlatform.clearCache();
