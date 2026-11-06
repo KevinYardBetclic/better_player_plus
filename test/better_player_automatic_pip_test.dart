@@ -94,11 +94,12 @@ void main() {
     test('a request made while the player is being created still reaches it', () async {
       final player = VideoPlayerController();
 
-      final request = player.setStartsPictureInPictureAutomatically(true);
-      await request;
+      await player.setStartsPictureInPictureAutomatically(true);
 
-      final methods = calls.map((MethodCall call) => call.method).toList();
-      expect(methods.indexOf('setStartsPictureInPictureAutomatically'), greaterThan(methods.indexOf('create')));
+      expect(
+        calls.singleWhere((MethodCall call) => call.method == 'setStartsPictureInPictureAutomatically').arguments,
+        <String, dynamic>{'textureId': 1, 'enabled': true},
+      );
     });
   });
 }
