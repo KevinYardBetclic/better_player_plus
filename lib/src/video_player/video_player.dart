@@ -36,6 +36,7 @@ class VideoPlayerValue {
     this.isPip = false,
     this.aspectRatioIOS = '',
     this.rotationCorrection = 0,
+    this.crop = fullFrame,
   });
 
   /// Returns an instance with a `null` [Duration].
@@ -44,6 +45,9 @@ class VideoPlayerValue {
   /// Returns an instance with a `null` [Duration] and the given
   /// [errorDescription].
   new erroneous(String errorDescription) : this(duration: null, errorDescription: errorDescription);
+
+  /// The whole frame, as fractions of it.
+  static const Rect fullFrame = Rect.fromLTRB(0, 0, 1, 1);
 
   /// The total duration of the video.
   ///
@@ -95,6 +99,10 @@ class VideoPlayerValue {
   /// Clockwise rotation, in degrees, the texture needs to be displayed upright.
   final int rotationCorrection;
 
+  /// The part of the texture that is picture, as fractions of it. The rest is padding the
+  /// platform did not crop away, and is not displayed.
+  final Rect crop;
+
   /// Indicates whether or not the video has been loaded and is ready to play.
   bool get initialized => duration != null;
 
@@ -132,6 +140,7 @@ class VideoPlayerValue {
     bool? isPip,
     String? aspectRatioIOS,
     int? rotationCorrection,
+    Rect? crop,
   }) => VideoPlayerValue(
     duration: duration ?? this.duration,
     size: size ?? this.size,
@@ -147,6 +156,7 @@ class VideoPlayerValue {
     isPip: isPip ?? this.isPip,
     aspectRatioIOS: aspectRatioIOS ?? this.aspectRatioIOS,
     rotationCorrection: rotationCorrection ?? this.rotationCorrection,
+    crop: crop ?? this.crop,
   );
 
   @override
@@ -163,6 +173,7 @@ class VideoPlayerValue {
       'volume: $volume, '
       'aspectRatioIOS: $aspectRatioIOS, '
       'rotationCorrection: $rotationCorrection, '
+      'crop: $crop, '
       'errorDescription: $errorDescription)';
 }
 
@@ -180,6 +191,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// Constructs a [VideoPlayerController] and creates video controller on platform side.
   new({
     this.bufferingConfiguration = const BetterPlayerBufferingConfiguration(),
+    this.startsPictureInPictureAutomatically,
     bool autoCreate = true,
   }) : super(VideoPlayerValue(duration: null)) {
     if (autoCreate) {
@@ -188,6 +200,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   final BetterPlayerBufferingConfiguration bufferingConfiguration;
+
+  /// See [BetterPlayerConfiguration.startsPictureInPictureAutomatically].
+  final bool? startsPictureInPictureAutomatically;
 
   final StreamController<VideoEvent> videoEventStreamController = StreamController.broadcast();
   final Completer<void> _creatingCompleter = Completer<void>();
@@ -208,7 +223,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   /// Attempts to open the given [dataSource] and load metadata about the video.
   Future<void> _create() async {
-    _textureId = await _videoPlayerPlatform.create(bufferingConfiguration: bufferingConfiguration);
+    _textureId = await _videoPlayerPlatform.create(
+      bufferingConfiguration: bufferingConfiguration,
+      startsPictureInPictureAutomatically: startsPictureInPictureAutomatically,
+    );
     _creatingCompleter.complete(null);
 
     unawaited(_applyLooping());
@@ -240,16 +258,21 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
             value = value.copyWith(isBuffering: false);
           }
 
+        // Reported by the platform, so only followed here: sending them back as commands echoes
+        // every play/pause, and two of them crossing (a pause and a play sent back to back)
+        // keep the player flipping between the two for good.
         case VideoEventType.play:
-          play();
+          _followPlatformPlayback(isPlaying: true);
         case VideoEventType.pause:
-          pause();
+          _followPlatformPlayback(isPlaying: false);
         case VideoEventType.seek:
           seekTo(event.position);
         case VideoEventType.pipStart:
           value = value.copyWith(isPip: true);
         case VideoEventType.pipStop:
           value = value.copyWith(isPip: false);
+        case VideoEventType.crop:
+          value = value.copyWith(crop: event.crop);
         case VideoEventType.unknown:
           break;
       }
@@ -388,7 +411,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       return;
     }
 
-    value = VideoPlayerValue(duration: null, isLooping: value.isLooping, volume: value.volume);
+    // The crop is kept: the platform only reports it when it changes, so a new source cut the same
+    // way would otherwise leave the padding on screen.
+    value = VideoPlayerValue(duration: null, isLooping: value.isLooping, volume: value.volume, crop: value.crop);
 
     if (!_creatingCompleter.isCompleted) {
       await _creatingCompleter.future;
@@ -475,27 +500,39 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       if (_isDisposed) {
         return;
       }
-      _timer?.cancel();
-      _timer = Timer.periodic(const Duration(milliseconds: 300), (Timer timer) async {
-        if (_isDisposed) {
-          return;
-        }
-        final Duration? newPosition = await position;
-        final DateTime? newAbsolutePosition = await absolutePosition;
-        if (_isDisposed) {
-          return;
-        }
-        _updatePosition(newPosition, absolutePosition: newAbsolutePosition);
-        if (_seekPosition != null && newPosition != null) {
-          final difference = newPosition.inMilliseconds - _seekPosition!.inMilliseconds;
-          if (difference > 0) {
-            _seekPosition = null;
-          }
-        }
-      });
+      _startPositionUpdates();
     } else {
       await _videoPlayerPlatform.pause(_textureId);
     }
+  }
+
+  void _followPlatformPlayback({required bool isPlaying}) {
+    value = value.copyWith(isPlaying: isPlaying);
+    _timer?.cancel();
+    if (isPlaying) {
+      _startPositionUpdates();
+    }
+  }
+
+  void _startPositionUpdates() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(milliseconds: 300), (Timer timer) async {
+      if (_isDisposed) {
+        return;
+      }
+      final Duration? newPosition = await position;
+      final DateTime? newAbsolutePosition = await absolutePosition;
+      if (_isDisposed) {
+        return;
+      }
+      _updatePosition(newPosition, absolutePosition: newAbsolutePosition);
+      if (_seekPosition != null && newPosition != null) {
+        final difference = newPosition.inMilliseconds - _seekPosition!.inMilliseconds;
+        if (difference > 0) {
+          _seekPosition = null;
+        }
+      }
+    });
   }
 
   Future<void> _applyVolume() async {
@@ -514,7 +551,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   /// The position in the current video.
   Future<Duration?> get position async {
-    if (!value.initialized && _isDisposed) {
+    if (!_created || _isDisposed) {
       return null;
     }
     return _videoPlayerPlatform.getPosition(_textureId);
@@ -523,7 +560,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// The absolute position in the current video stream
   /// (i.e. EXT-X-PROGRAM-DATE-TIME in HLS).
   Future<DateTime?> get absolutePosition async {
-    if (!value.initialized && _isDisposed) {
+    if (!_created || _isDisposed) {
       return null;
     }
     return _videoPlayerPlatform.getAbsolutePosition(_textureId);
@@ -594,6 +631,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// [height] specifies height of the selected track
   /// [bitrate] specifies bitrate of the selected track
   Future<void> setTrackParameters(int? width, int? height, int? bitrate) async {
+    if (!_created || _isDisposed) {
+      return;
+    }
     await _videoPlayerPlatform.setTrackParameters(_textureId, width, height, bitrate);
   }
 
@@ -624,11 +664,27 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   void setAudioTrack(String? name, int? index) {
+    if (!_created || _isDisposed) {
+      return;
+    }
     _videoPlayerPlatform.setAudioTrack(_textureId, name, index);
   }
 
   void setMixWithOthers(bool mixWithOthers) {
+    if (!_created || _isDisposed) {
+      return;
+    }
     _videoPlayerPlatform.setMixWithOthers(_textureId, mixWithOthers);
+  }
+
+  Future<void> setStartsPictureInPictureAutomatically(bool enabled) async {
+    // A call made while the player is being created must not be lost: it would leave the player on
+    // the setting it was created with.
+    await _creatingCompleter.future;
+    if (_isDisposed) {
+      return;
+    }
+    await _videoPlayerPlatform.setStartsPictureInPictureAutomatically(_textureId, enabled);
   }
 
   static Future<void> clearCache() => _videoPlayerPlatform.clearCache();
@@ -637,6 +693,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// [BetterPlayerController.setManagesAudioSession].
   static Future<void> setManagesAudioSession(bool managesAudioSession) =>
       _videoPlayerPlatform.setManagesAudioSession(managesAudioSession);
+
+  /// Sets whether iOS may start picture-in-picture on its own. See
+  /// [BetterPlayerController.setAutomaticPictureInPicture].
+  static Future<void> setAutomaticPictureInPicture(bool enabled) =>
+      _videoPlayerPlatform.setAutomaticPictureInPicture(enabled);
 
   static Future<void> preCache(DataSource dataSource, int preCacheSize) =>
       _videoPlayerPlatform.preCache(dataSource, preCacheSize);
@@ -662,10 +723,12 @@ class _VideoPlayerState extends State<VideoPlayer> {
     _listener = () {
       final int? newTextureId = widget.controller!.textureId;
       final int newRotationCorrection = widget.controller!.value.rotationCorrection;
-      if (newTextureId != _textureId || newRotationCorrection != _rotationCorrection) {
+      final Rect newCrop = widget.controller!.value.crop;
+      if (newTextureId != _textureId || newRotationCorrection != _rotationCorrection || newCrop != _crop) {
         setState(() {
           _textureId = newTextureId;
           _rotationCorrection = newRotationCorrection;
+          _crop = newCrop;
         });
       }
     };
@@ -674,12 +737,14 @@ class _VideoPlayerState extends State<VideoPlayer> {
   late VoidCallback _listener;
   int? _textureId;
   int _rotationCorrection = 0;
+  Rect _crop = VideoPlayerValue.fullFrame;
 
   @override
   void initState() {
     super.initState();
     _textureId = widget.controller!.textureId;
     _rotationCorrection = widget.controller!.value.rotationCorrection;
+    _crop = widget.controller!.value.crop;
     // Need to listen for initialization events since the actual texture ID
     // becomes available after asynchronous initialization finishes.
     widget.controller!.addListener(_listener);
@@ -691,6 +756,7 @@ class _VideoPlayerState extends State<VideoPlayer> {
     oldWidget.controller!.removeListener(_listener);
     _textureId = widget.controller!.textureId;
     _rotationCorrection = widget.controller!.value.rotationCorrection;
+    _crop = widget.controller!.value.crop;
     widget.controller!.addListener(_listener);
   }
 
@@ -705,9 +771,40 @@ class _VideoPlayerState extends State<VideoPlayer> {
     if (_textureId == null) {
       return Container();
     }
-    final Widget view = _videoPlayerPlatform.buildView(_textureId);
+    final Widget texture = _videoPlayerPlatform.buildView(_textureId);
+    // The crop is in the frame's own coordinates, so it applies before the rotation.
+    final Widget view = _crop == VideoPlayerValue.fullFrame ? texture : _CroppedTexture(crop: _crop, child: texture);
     return _rotationCorrection == 0 ? view : RotatedBox(quarterTurns: _rotationCorrection ~/ 90, child: view);
   }
+}
+
+/// Shows only [crop] of [child], stretched over the whole box.
+class _CroppedTexture extends StatelessWidget {
+  const new({required this.crop, required this.child});
+
+  final Rect crop;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (BuildContext context, BoxConstraints constraints) {
+      if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight || crop.isEmpty) {
+        return child;
+      }
+      final double width = constraints.maxWidth / crop.width;
+      final double height = constraints.maxHeight / crop.height;
+      return ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.topLeft,
+          minWidth: width,
+          maxWidth: width,
+          minHeight: height,
+          maxHeight: height,
+          child: Transform.translate(offset: Offset(-crop.left * width, -crop.top * height), child: child),
+        ),
+      );
+    },
+  );
 }
 
 /// Used to configure the [VideoProgressIndicator] widget's colors for how it

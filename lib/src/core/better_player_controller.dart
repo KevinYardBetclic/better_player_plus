@@ -24,8 +24,20 @@ class BetterPlayerController {
     _betterPlayerControlsConfiguration = betterPlayerConfiguration.controlsConfiguration;
     _eventListeners.add(eventListener);
     if (betterPlayerDataSource != null) {
-      setupDataSource(betterPlayerDataSource);
+      // The constructor cannot await: a setup that fails, or that outlives a dispose, must end as an
+      // `exception` event for the listeners, never as an error nobody awaits.
+      unawaited(setupDataSource(betterPlayerDataSource).catchError(_onSetupDataSourceError));
     }
+  }
+
+  void _onSetupDataSourceError(Object error, StackTrace stackTrace) {
+    // A player that already reported its error has posted the event through _onVideoPlayerChanged.
+    if (_disposed || (videoPlayerController?.value.hasError ?? false)) {
+      return;
+    }
+    _postEvent(
+      BetterPlayerEvent(BetterPlayerEventType.exception, parameters: <String, dynamic>{'exception': error.toString()}),
+    );
   }
 
   static const String _durationParameter = 'duration';
@@ -237,6 +249,7 @@ class BetterPlayerController {
     if (videoPlayerController == null) {
       videoPlayerController = VideoPlayerController(
         bufferingConfiguration: betterPlayerDataSource.bufferingConfiguration,
+        startsPictureInPictureAutomatically: betterPlayerConfiguration.startsPictureInPictureAutomatically,
       );
       videoPlayerController?.addListener(_onVideoPlayerChanged);
     }
@@ -253,7 +266,9 @@ class BetterPlayerController {
     if (_isDataSourceAsms(betterPlayerDataSource)) {
       unawaited(
         _setupAsmsDataSource(betterPlayerDataSource).then((value) {
-          _setupSubtitles();
+          if (!_disposed) {
+            _setupSubtitles();
+          }
         }),
       );
     } else {
@@ -262,6 +277,10 @@ class BetterPlayerController {
 
     ///Process data source
     await _setupDataSource(betterPlayerDataSource);
+    // Disposed while the source was loading: the native player is gone, a track call would only fail.
+    if (_disposed) {
+      return;
+    }
     await setTrack(BetterPlayerAsmsTrack.defaultTrack());
   }
 
@@ -288,8 +307,14 @@ class BetterPlayerController {
   ///master playlist.
   Future<void> _setupAsmsDataSource(BetterPlayerDataSource source) async {
     final String? data = await BetterPlayerAsmsUtils.getDataFromUrl(betterPlayerDataSource!.url, _getHeaders());
+    if (_disposed) {
+      return;
+    }
     if (data != null) {
       final BetterPlayerAsmsDataHolder response = await BetterPlayerAsmsUtils.parse(data, betterPlayerDataSource!.url);
+      if (_disposed) {
+        return;
+      }
 
       /// Load tracks
       if (_betterPlayerDataSource?.useAsmsTracks ?? false) {
@@ -1185,6 +1210,46 @@ class BetterPlayerController {
   /// Only affects iOS; on Android it completes without doing anything.
   static Future<void> setManagesAudioSession(bool managesAudioSession) =>
       VideoPlayerController.setManagesAudioSession(managesAudioSession);
+
+  /// Sets whether iOS may move a playing video into picture-in-picture on its
+  /// own as the app goes to the background, for every player already alive and
+  /// every player created from now on — except those given their own setting
+  /// ([BetterPlayerConfiguration.startsPictureInPictureAutomatically],
+  /// [setStartsPictureInPictureAutomatically]).
+  ///
+  /// By default (`true`) every player arms automatic entry
+  /// (`canStartPictureInPictureAutomaticallyFromInline`) as soon as it is shown
+  /// or played, so leaving the app with a video playing opens a
+  /// picture-in-picture window. Pass `false` when picture-in-picture must only
+  /// open on an explicit [enablePictureInPicture] call, which keeps working.
+  ///
+  /// With `false`, a player holds no picture-in-picture controller between
+  /// requests: iOS 26 opens the window for any controller attached to a
+  /// playing layer, whatever its automatic-entry flag says. The controller is
+  /// built on the request, so the window can take a moment longer to open.
+  ///
+  /// Only affects iOS; on Android it completes without doing anything.
+  static Future<void> setAutomaticPictureInPicture(bool enabled) =>
+      VideoPlayerController.setAutomaticPictureInPicture(enabled);
+
+  /// Sets whether iOS may move this player into picture-in-picture on its own
+  /// as the app goes to the background, whatever [setAutomaticPictureInPicture]
+  /// says, which no longer changes it.
+  ///
+  /// When several players play at once, iOS picks which one moves into the
+  /// window, so leave automatic entry on only for the one that should. Set it
+  /// from creation with
+  /// [BetterPlayerConfiguration.startsPictureInPictureAutomatically].
+  ///
+  /// Only affects iOS; on Android it completes without doing anything.
+  Future<void> setStartsPictureInPictureAutomatically(bool enabled) {
+    final controller = videoPlayerController;
+    if (controller == null) {
+      throw StateError('The data source has not been initialized');
+    }
+
+    return controller.setStartsPictureInPictureAutomatically(enabled);
+  }
 
   ///Build headers map that will be used to setup video player controller. Apply
   ///DRM headers if available.

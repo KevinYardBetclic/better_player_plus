@@ -49,3 +49,24 @@ Known limitations:
 Android: When PiP is enabled, Better Player will open full screen mode to play video correctly. When
 user disables PiP, Better Player will back to the previous settings and for a half of second your device
 will have incorrect orientation.
+### Automatic picture-in-picture on iOS
+On iOS, a playing video moves into picture-in-picture on its own when the app goes to the
+background. To only open picture-in-picture on an explicit `enablePictureInPicture` call, turn
+automatic entry off, once, before creating the first player:
+```dart
+BetterPlayerController.setAutomaticPictureInPicture(false)
+```
+The window then takes a moment longer to open on request: the player keeps no picture-in-picture
+controller in between, since iOS 26 opens the window for any controller on a playing video. On
+Android the call does nothing.
+
+When several players play at once, iOS picks which one moves into the window. Give automatic entry
+to the one that should, and keep it off for the others, from creation:
+```dart
+BetterPlayerConfiguration(startsPictureInPictureAutomatically: false)
+```
+or later, on one player:
+```dart
+_betterPlayerController.setStartsPictureInPictureAutomatically(true)
+```
+A player given its own setting keeps it whatever `setAutomaticPictureInPicture` says next.

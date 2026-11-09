@@ -142,6 +142,8 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             CLEAR_CACHE_METHOD -> clearCache(result)
             // The audio session is an iOS concept; Android audio focus stays with ExoPlayer.
             SET_MANAGES_AUDIO_SESSION_METHOD -> result.success(null)
+            // Automatic entry is an iOS concept; Android picture-in-picture stays with the activity.
+            SET_AUTOMATIC_PICTURE_IN_PICTURE_METHOD -> result.success(null)
             else -> {
                 if (call.argument<Any>(TEXTURE_ID_PARAMETER) == null) {
 //                    result.error(
@@ -261,6 +263,8 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             SET_ASPECT_RATIO_METHOD -> {
                 result.success(null)
             }
+
+            SET_STARTS_PICTURE_IN_PICTURE_AUTOMATICALLY_METHOD -> result.success(null)
 
             DISPOSE_METHOD -> {
                 dispose(player, textureId)
@@ -608,6 +612,8 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         private const val SET_ASPECT_RATIO_METHOD = "setAspectRatio"
         private const val CLEAR_CACHE_METHOD = "clearCache"
         private const val SET_MANAGES_AUDIO_SESSION_METHOD = "setManagesAudioSession"
+        private const val SET_AUTOMATIC_PICTURE_IN_PICTURE_METHOD = "setAutomaticPictureInPicture"
+        private const val SET_STARTS_PICTURE_IN_PICTURE_AUTOMATICALLY_METHOD = "setStartsPictureInPictureAutomatically"
         private const val DISPOSE_METHOD = "dispose"
         private const val PRE_CACHE_METHOD = "preCache"
         private const val STOP_PRE_CACHE_METHOD = "stopPreCache"

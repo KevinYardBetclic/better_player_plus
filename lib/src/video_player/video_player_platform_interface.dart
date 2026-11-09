@@ -65,7 +65,10 @@ abstract class VideoPlayerPlatform {
   }
 
   /// Creates an instance of a video player and returns its textureId.
-  Future<int?> create({BetterPlayerBufferingConfiguration? bufferingConfiguration}) {
+  Future<int?> create({
+    BetterPlayerBufferingConfiguration? bufferingConfiguration,
+    bool? startsPictureInPictureAutomatically,
+  }) {
     throw UnimplementedError('create() has not been implemented.');
   }
 
@@ -168,6 +171,18 @@ abstract class VideoPlayerPlatform {
   /// [BetterPlayerController.setManagesAudioSession].
   Future<void> setManagesAudioSession(bool managesAudioSession) {
     throw UnimplementedError('setManagesAudioSession() has not been implemented.');
+  }
+
+  /// Sets whether iOS may start picture-in-picture on its own. See
+  /// [BetterPlayerController.setAutomaticPictureInPicture].
+  Future<void> setAutomaticPictureInPicture(bool enabled) {
+    throw UnimplementedError('setAutomaticPictureInPicture() has not been implemented.');
+  }
+
+  /// Sets whether iOS may start picture-in-picture on its own for one player. See
+  /// [BetterPlayerController.setStartsPictureInPictureAutomatically].
+  Future<void> setStartsPictureInPictureAutomatically(int? textureId, bool enabled) {
+    throw UnimplementedError('setStartsPictureInPictureAutomatically() has not been implemented.');
   }
 
   /// Returns a widget displaying the video with a given textureID.
@@ -383,6 +398,7 @@ class VideoEvent {
     this.buffered,
     this.position,
     this.rotationCorrection = 0,
+    this.crop,
   });
 
   /// The type of the event.
@@ -416,6 +432,11 @@ class VideoEvent {
   /// Only used if [eventType] is [VideoEventType.initialized].
   final int rotationCorrection;
 
+  /// The visible part of the platform's frames, as fractions of the frame.
+  ///
+  /// Only used if [eventType] is [VideoEventType.crop].
+  final Rect? crop;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -426,11 +447,17 @@ class VideoEvent {
           duration == other.duration &&
           size == other.size &&
           rotationCorrection == other.rotationCorrection &&
+          crop == other.crop &&
           listEquals(buffered, other.buffered);
 
   @override
   int get hashCode =>
-      eventType.hashCode ^ duration.hashCode ^ size.hashCode ^ rotationCorrection.hashCode ^ buffered.hashCode;
+      eventType.hashCode ^
+      duration.hashCode ^
+      size.hashCode ^
+      rotationCorrection.hashCode ^
+      crop.hashCode ^
+      buffered.hashCode;
 }
 
 /// Type of the event.
@@ -467,6 +494,10 @@ enum VideoEventType {
 
   /// Picture in picture mode has been dismissed
   pipStop,
+
+  /// The platform shows more of its frames than the video: only [VideoEvent.crop] of each is
+  /// picture.
+  crop,
 
   /// An unknown event has been received.
   unknown,
