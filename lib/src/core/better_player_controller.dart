@@ -1232,6 +1232,20 @@ class BetterPlayerController {
   static Future<void> setAutomaticPictureInPicture(bool enabled) =>
       VideoPlayerController.setAutomaticPictureInPicture(enabled);
 
+  /// Sets whether a playing video keeps the display awake, for every player
+  /// already alive and every player created from now on.
+  ///
+  /// By default (`true`) iOS keeps the screen on while any player plays video
+  /// (`AVPlayer.preventsDisplaySleepDuringVideoPlayback`), whatever the app
+  /// decides. Pass `false` when the app decides itself when the screen stays
+  /// on, for instance with a wakelock held only while the video is watched:
+  /// a playing video then lets the device dim and lock after its auto-lock
+  /// delay, unless something else keeps it awake.
+  ///
+  /// Only affects iOS; on Android it completes without doing anything.
+  static Future<void> setPreventsDisplaySleep(bool preventsDisplaySleep) =>
+      VideoPlayerController.setPreventsDisplaySleep(preventsDisplaySleep);
+
   /// Sets whether iOS may move this player into picture-in-picture on its own
   /// as the app goes to the background, whatever [setAutomaticPictureInPicture]
   /// says, which no longer changes it.

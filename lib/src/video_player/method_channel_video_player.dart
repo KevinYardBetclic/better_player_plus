@@ -208,6 +208,12 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
       _channel.invokeMethod<void>('setAutomaticPictureInPicture', <String, dynamic>{'enabled': enabled});
 
   @override
+  Future<void> setPreventsDisplaySleep(bool preventsDisplaySleep) => _channel.invokeMethod<void>(
+    'setPreventsDisplaySleep',
+    <String, dynamic>{'preventsDisplaySleep': preventsDisplaySleep},
+  );
+
+  @override
   Future<void> setStartsPictureInPictureAutomatically(int? textureId, bool enabled) => _channel.invokeMethod<void>(
     'setStartsPictureInPictureAutomatically',
     <String, dynamic>{'textureId': textureId, 'enabled': enabled},

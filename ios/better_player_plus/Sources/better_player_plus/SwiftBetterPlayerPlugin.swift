@@ -25,6 +25,8 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
     /// The players given their own automatic picture-in-picture setting, which the plugin-wide one no
     /// longer overrides.
     private var playersWithOwnAutomaticPictureInPicture: Set<Int64> = []
+    // When false, a playing video no longer keeps the display awake: the host app decides.
+    private var preventsDisplaySleep = true
 
     init(registrar: FlutterPluginRegistrar) {
         self.messenger = registrar.messenger()
@@ -67,6 +69,7 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
         let textureId = newTextureId()
         let eventChannel = FlutterEventChannel(name: "better_player_channel/videoEvents\(textureId)", binaryMessenger: messenger)
         player.managesAudioSession = managesAudioSession
+        player.preventsDisplaySleep = preventsDisplaySleep
         player.startsPictureInPictureAutomatically = ownSetting ?? startsPictureInPictureAutomatically
         if ownSetting != nil { playersWithOwnAutomaticPictureInPicture.insert(textureId) }
         player.setMixWithOthers(false)
@@ -250,6 +253,17 @@ extension BetterPlayerPlugin {
             }
             self.managesAudioSession = managesAudioSession
             for (_, player) in players { player.managesAudioSession = managesAudioSession }
+            result(nil)
+            return
+        }
+        if call.method == "setPreventsDisplaySleep" {
+            // A malformed call keeps the current setting rather than silently holding the screen on again.
+            guard let preventsDisplaySleep = ((call.arguments as? [String: Any])?["preventsDisplaySleep"] as? NSNumber)?.boolValue else {
+                result(FlutterError(code: "INVALID_ARGUMENT", message: "setPreventsDisplaySleep expects a preventsDisplaySleep bool", details: nil))
+                return
+            }
+            self.preventsDisplaySleep = preventsDisplaySleep
+            for (_, player) in players { player.preventsDisplaySleep = preventsDisplaySleep }
             result(nil)
             return
         }

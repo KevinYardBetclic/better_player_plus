@@ -179,6 +179,12 @@ abstract class VideoPlayerPlatform {
     throw UnimplementedError('setAutomaticPictureInPicture() has not been implemented.');
   }
 
+  /// Sets whether a playing video keeps the display awake. See
+  /// [BetterPlayerController.setPreventsDisplaySleep].
+  Future<void> setPreventsDisplaySleep(bool preventsDisplaySleep) {
+    throw UnimplementedError('setPreventsDisplaySleep() has not been implemented.');
+  }
+
   /// Sets whether iOS may start picture-in-picture on its own for one player. See
   /// [BetterPlayerController.setStartsPictureInPictureAutomatically].
   Future<void> setStartsPictureInPictureAutomatically(int? textureId, bool enabled) {

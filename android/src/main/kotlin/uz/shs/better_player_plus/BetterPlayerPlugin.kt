@@ -144,6 +144,8 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             SET_MANAGES_AUDIO_SESSION_METHOD -> result.success(null)
             // Automatic entry is an iOS concept; Android picture-in-picture stays with the activity.
             SET_AUTOMATIC_PICTURE_IN_PICTURE_METHOD -> result.success(null)
+            // ExoPlayer renders into a texture and never holds the screen on; the app decides.
+            SET_PREVENTS_DISPLAY_SLEEP_METHOD -> result.success(null)
             else -> {
                 if (call.argument<Any>(TEXTURE_ID_PARAMETER) == null) {
 //                    result.error(
@@ -613,6 +615,7 @@ class BetterPlayerPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         private const val CLEAR_CACHE_METHOD = "clearCache"
         private const val SET_MANAGES_AUDIO_SESSION_METHOD = "setManagesAudioSession"
         private const val SET_AUTOMATIC_PICTURE_IN_PICTURE_METHOD = "setAutomaticPictureInPicture"
+        private const val SET_PREVENTS_DISPLAY_SLEEP_METHOD = "setPreventsDisplaySleep"
         private const val SET_STARTS_PICTURE_IN_PICTURE_AUTOMATICALLY_METHOD = "setStartsPictureInPictureAutomatically"
         private const val DISPOSE_METHOD = "dispose"
         private const val PRE_CACHE_METHOD = "preCache"

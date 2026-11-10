@@ -699,6 +699,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   static Future<void> setAutomaticPictureInPicture(bool enabled) =>
       _videoPlayerPlatform.setAutomaticPictureInPicture(enabled);
 
+  /// Sets whether a playing video keeps the display awake. See
+  /// [BetterPlayerController.setPreventsDisplaySleep].
+  static Future<void> setPreventsDisplaySleep(bool preventsDisplaySleep) =>
+      _videoPlayerPlatform.setPreventsDisplaySleep(preventsDisplaySleep);
+
   static Future<void> preCache(DataSource dataSource, int preCacheSize) =>
       _videoPlayerPlatform.preCache(dataSource, preCacheSize);
 

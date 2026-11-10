@@ -22,6 +22,11 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
     public var isLooping: Bool = false
     /// When false, the host app owns `AVAudioSession`: this player never sets its category nor activates it.
     public var managesAudioSession: Bool = true
+    /// When false, playing video no longer keeps the display awake; the host app decides.
+    public var preventsDisplaySleep: Bool {
+        get { player.preventsDisplaySleepDuringVideoPlayback }
+        set { player.preventsDisplaySleepDuringVideoPlayback = newValue }
+    }
     /// Whether iOS may move this player into picture-in-picture on its own as the app goes to the
     /// background. Picture-in-picture asked for explicitly works either way.
     public var startsPictureInPictureAutomatically: Bool = true {
