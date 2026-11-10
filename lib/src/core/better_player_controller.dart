@@ -1242,6 +1242,10 @@ class BetterPlayerController {
   /// a playing video then lets the device dim and lock after its auto-lock
   /// delay, unless something else keeps it awake.
   ///
+  /// The plugin's own fullscreen releases any wakelock as it closes, whatever
+  /// [BetterPlayerConfiguration.allowedScreenSleep] says, including the app's.
+  /// An app holding its own wakelock should show fullscreen itself.
+  ///
   /// Only affects iOS; on Android it completes without doing anything.
   static Future<void> setPreventsDisplaySleep(bool preventsDisplaySleep) =>
       VideoPlayerController.setPreventsDisplaySleep(preventsDisplaySleep);
